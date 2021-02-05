@@ -7,5 +7,7 @@ A policy can be configured in the Startup.cs file, so that the policy is applied
 The policies can be bypassed when executing, if desired.
 
 Documentation for the package can be found at:
+
 https://github.com/App-vNext/Polly/wiki/Cache
+
 https://github.com/App-vNext/Polly.Caching.MemoryCache
