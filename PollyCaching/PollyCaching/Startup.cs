@@ -48,6 +48,11 @@ namespace PollyCaching
                         .GetRequiredService<IAsyncCacheProvider>()
                         .AsyncFor<HttpResponseMessage>(),
                         TimeSpan.FromMinutes(5))
+                    },
+                    {
+                        "circuitBreakerPolicy",
+                        Policy.Handle<HttpRequestException>()
+                        .CircuitBreakerAsync(1, TimeSpan.FromMinutes(1)) // Circuit remains broken for 1 minute
                     }
                 };
                 return registry;
