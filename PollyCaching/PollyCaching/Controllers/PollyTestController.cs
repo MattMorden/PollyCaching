@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Polly;
+using Polly.CircuitBreaker;
 using Polly.Registry;
 using System;
 using System.Collections.Generic;
@@ -13,7 +14,7 @@ namespace PollyCaching.Controllers
     [ApiController]
     [Route("[controller]")]
     public class PollyTestController : ControllerBase
-    {       
+    {
         private readonly ILogger<PollyTestController> _logger;
         private readonly IHttpClientFactory _httpClientFactory;
         private readonly IReadOnlyPolicyRegistry<string> _policyRegistry;
@@ -39,7 +40,8 @@ namespace PollyCaching.Controllers
 
             Context context = new Context("Test400Key"); // This is the cache key
 
-            HttpResponseMessage responseMessage = await policy.ExecuteAsync(async c => {
+            HttpResponseMessage responseMessage = await policy.ExecuteAsync(async c =>
+            {
                 return await httpClient.SendAsync(httpRequestMessage);
             }, context);
 
@@ -55,5 +57,47 @@ namespace PollyCaching.Controllers
         {
             return Ok("Test 400 endpoint worked!");
         }
+
+
+        [HttpGet]
+        [Route("TestCircuitBreaker")]
+        public async Task<IActionResult> TestCircuitBreaker()
+        {
+            // Retrieve policy from the registry
+            var circuitBreakerPolicy = _policyRegistry.Get<Polly.CircuitBreaker.AsyncCircuitBreakerPolicy>("circuitBreakerPolicy");          
+            
+            if(circuitBreakerPolicy.CircuitState == CircuitState.Open)
+            {
+                return Ok("Circuit stat is currently open");
+            }
+
+            var httpClient = _httpClientFactory.CreateClient("PollyTest");
+            HttpRequestMessage httpRequestMessage = new HttpRequestMessage(HttpMethod.Get,
+                new Uri(httpClient.BaseAddress + "PollyTest/ThrowException"));
+
+
+            var response = await circuitBreakerPolicy.ExecuteAsync(async () =>
+            {
+                Console.WriteLine("Sending request to ThrowException endpoint");
+                var res = await httpClient.SendAsync(httpRequestMessage);
+                res.EnsureSuccessStatusCode();
+                return res;
+            });
+
+
+            return Ok(response);
+
+        }
+
+        [HttpGet]
+        [Route("NotFound")]
+        public async Task<IActionResult> NotFound()
+        {
+            Console.WriteLine("NotFound Endpoint hit.");
+            return await NotFound();
+        }
+
+
+
     }
 }
